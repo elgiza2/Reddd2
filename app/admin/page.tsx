@@ -57,7 +57,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-black text-white p-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">PepeCase Admin Panel</h1>
+        <h1 className="text-2xl font-bold mb-6">Spark Admin Panel</h1>
 
         <div className="grid gap-6">
           {/* Bot Status */}

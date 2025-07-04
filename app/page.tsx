@@ -1,77 +1,159 @@
 "use client"
 
-import { useState } from "react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { TonLogo } from "@/components/ton-logo"
+import { UserProfile } from "@/components/user-profile"
+import { LiveWins } from "@/components/live-wins"
+import { BottomNavigation } from "@/components/bottom-navigation"
+import { useSound } from "@/hooks/use-sound"
+import { boxes } from "@/data/boxes"
+import { Gift, Lock } from "lucide-react"
+import Image from "next/image"
 
-export default function Home() {
-  const [apiKey, setApiKey] = useState("")
-  const [isApiKeyValid, setIsApiKeyValid] = useState(false)
-  const [isApiKeyLoading, setIsApiKeyLoading] = useState(false)
+export default function HomePage() {
+  const [userBalance, setUserBalance] = useState(0)
+  const [totalDeposited, setTotalDeposited] = useState(0)
+  const router = useRouter()
+  const { playSound } = useSound()
 
-  const handleApiKeySubmit = async (e: any) => {
-    e.preventDefault()
-
-    setIsApiKeyLoading(true)
-
-    // Simulate API key validation
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    if (apiKey === "valid_api_key") {
-      setIsApiKeyValid(true)
-      toast.success("API Key is valid!")
-    } else {
-      setIsApiKeyValid(false)
-      toast.error("Invalid API Key. Please try again.")
+  useEffect(() => {
+    // Load user balance and total deposited
+    const savedBalance = localStorage.getItem("userBalance")
+    const savedDeposited = localStorage.getItem("totalDeposited")
+    if (savedBalance) {
+      setUserBalance(Number.parseFloat(savedBalance))
     }
+    if (savedDeposited) {
+      setTotalDeposited(Number.parseFloat(savedDeposited))
+    }
+  }, [])
 
-    setIsApiKeyLoading(false)
+  const handleCaseClick = (caseId: string) => {
+    playSound("click")
+    router.push(`/case/${caseId}`)
   }
 
+  const canOpenFreeBox = (box: any) => {
+    if (box.type === "free" && box.requiredDeposit) {
+      return totalDeposited >= box.requiredDeposit
+    }
+    return box.type === "free"
+  }
+
+  // Separate free and paid boxes
+  const freeBoxes = boxes.filter((box) => box.type === "free")
+  const paidBoxes = boxes.filter((box) => box.type === "paid")
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2">
-      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-emerald-500 to-gray-100 rounded-b-3xl"></div>
-      <Card className="w-[90%] max-w-md z-10">
-        <CardHeader>
-          <CardTitle>Welcome!</CardTitle>
-          <CardDescription>Enter your API key to get started.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleApiKeySubmit} className="space-y-4">
-            <div className="grid w-full gap-2">
-              <Label htmlFor="api-key">API Key</Label>
-              <Input
-                id="api-key"
-                placeholder="sk-..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                disabled={isApiKeyLoading}
-              />
-            </div>
-            <Button disabled={isApiKeyLoading} type="submit" className="w-full">
-              {isApiKeyLoading ? "Validating..." : "Validate API Key"}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <div>
-            Status:{" "}
-            <span
-              className={cn({
-                "text-green-500": isApiKeyValid,
-                "text-red-500": !isApiKeyValid && apiKey !== "",
-                "text-gray-500": apiKey === "",
-              })}
-            >
-              {isApiKeyValid ? "Valid" : !isApiKeyValid && apiKey !== "" ? "Invalid" : "Not validated"}
-            </span>
+    <div className="min-h-screen bg-black text-white pb-20">
+      {/* User Profile */}
+      <UserProfile balance={userBalance} />
+
+      {/* Live Wins */}
+      <LiveWins />
+
+      {/* Free Bonus Boxes */}
+      {freeBoxes.length > 0 && (
+        <div className="px-4 mb-6">
+          <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+            <Gift className="w-5 h-5 text-green-400" />
+            Bonus Boxes
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {freeBoxes.map((box) => {
+              const isUnlocked = canOpenFreeBox(box)
+              return (
+                <button
+                  key={box.id}
+                  onClick={() => isUnlocked && handleCaseClick(box.id)}
+                  disabled={!isUnlocked}
+                  className={`relative p-3 rounded-xl transition-all duration-300 ${
+                    isUnlocked ? "hover:scale-105 active:scale-95 cursor-pointer" : "opacity-50 cursor-not-allowed"
+                  }`}
+                >
+                  <div className="relative">
+                    {/* Lock overlay for locked boxes */}
+                    {!isUnlocked && (
+                      <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center z-10">
+                        <div className="text-center">
+                          <Lock className="w-6 h-6 text-gray-400 mx-auto mb-1" />
+                          <p className="text-gray-400 text-xs">Deposit {box.requiredDeposit} TON</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="w-full h-24 mb-3 rounded-lg overflow-hidden">
+                      <Image
+                        src={box.image || "/placeholder.svg"}
+                        alt={box.name}
+                        width={120}
+                        height={96}
+                        className="w-full h-full object-contain"
+                        style={{
+                          filter: isUnlocked
+                            ? "drop-shadow(0 0 8px rgba(34, 197, 94, 0.3))"
+                            : "drop-shadow(0 0 4px rgba(255,255,255,0.1))",
+                        }}
+                      />
+                    </div>
+
+                    <h3 className="text-white font-medium text-sm mb-2">{box.name}</h3>
+
+                    <div className="flex items-center justify-center gap-1">
+                      {isUnlocked ? (
+                        <>
+                          <span className="text-green-400 font-bold text-sm">FREE</span>
+                          <Gift className="w-4 h-4 text-green-400" />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-gray-400 font-bold text-sm">LOCKED</span>
+                          <Lock className="w-4 h-4 text-gray-400" />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
-        </CardFooter>
-      </Card>
+        </div>
+      )}
+
+      {/* Regular Cases */}
+      <div className="px-4 mb-6">
+        <h2 className="text-lg font-bold mb-3">Cases</h2>
+        <div className="grid grid-cols-2 gap-3">
+          {paidBoxes.map((box) => (
+            <button
+              key={box.id}
+              onClick={() => handleCaseClick(box.id)}
+              className="relative p-3 rounded-xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+            >
+              <div className="w-full h-24 mb-3 rounded-lg overflow-hidden">
+                <Image
+                  src={box.image || "/placeholder.svg"}
+                  alt={box.name}
+                  width={120}
+                  height={96}
+                  className="w-full h-full object-contain"
+                  style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.1))" }}
+                />
+              </div>
+
+              <h3 className="text-white font-medium text-sm mb-2">{box.name}</h3>
+
+              <div className="flex items-center justify-center gap-1">
+                <span className="text-yellow-400 font-bold text-sm">{box.price}</span>
+                <TonLogo size={12} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <BottomNavigation />
     </div>
   )
 }

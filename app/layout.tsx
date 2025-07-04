@@ -9,9 +9,9 @@ import { TonConnectProvider } from "@/components/ton-connect-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Telegram Boxes",
+  title: "Spark",
   description: "Open boxes and win prizes!",
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({

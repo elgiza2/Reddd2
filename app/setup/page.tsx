@@ -106,7 +106,7 @@ export default function SetupPage() {
   return (
     <div className="min-h-screen bg-black text-white p-4">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">🚀 PepeCase Setup</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">🚀 Spark Setup</h1>
 
         <Card className="bg-gray-900 border-gray-700 mb-6">
           <CardHeader>
