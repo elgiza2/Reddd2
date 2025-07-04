@@ -41,7 +41,7 @@ export function UserProfile({ balance, showDeposit = true }: UserProfileProps) {
   return (
     <div className="flex justify-between items-center px-4 py-4">
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center border-2 border-gray-600">
           {hasPhoto ? (
             <Image
               src={user.photo_url! || "/placeholder.svg"}

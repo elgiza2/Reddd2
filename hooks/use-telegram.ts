@@ -20,6 +20,12 @@ interface TelegramWebApp {
   ready: () => void
   expand: () => void
   close: () => void
+  HapticFeedback: {
+    impactOccurred: (style: "light" | "medium" | "heavy") => void
+    notificationOccurred: (type: "error" | "success" | "warning") => void
+    selectionChanged: () => void
+  }
+  showAlert: (message: string) => void
 }
 
 declare global {
@@ -43,6 +49,20 @@ export function useTelegram() {
     } catch (error) {
       console.error("Error fetching user photo:", error)
       return null
+    }
+  }
+
+  const hapticFeedback = (style: "light" | "medium" | "heavy") => {
+    if (typeof window !== "undefined" && window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.impactOccurred(style)
+    }
+  }
+
+  const showAlert = (message: string) => {
+    if (typeof window !== "undefined" && window.Telegram?.WebApp?.showAlert) {
+      window.Telegram.WebApp.showAlert(message)
+    } else {
+      alert(message)
     }
   }
 
@@ -116,5 +136,7 @@ export function useTelegram() {
     isLoading,
     startParam,
     getUserPhoto,
+    hapticFeedback,
+    showAlert,
   }
 }

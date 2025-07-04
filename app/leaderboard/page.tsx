@@ -20,7 +20,7 @@ export default function LeaderboardPage() {
   }, [])
   const router = useRouter()
   const { playSound } = useSound()
-  const { hapticFeedback, user } = useTelegram()
+  const { hapticFeedback, user, getUserPhoto } = useTelegram()
 
   const handleBack = () => {
     playSound("click")
@@ -57,20 +57,25 @@ export default function LeaderboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700">
-              {user && (
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700 border-2 border-gray-600">
+              {user && user.photo_url ? (
                 <Image
-                  src={user.photo_url || `/placeholder.svg?height=48&width=48&text=${user.first_name[0]}`}
+                  src={user.photo_url || "/placeholder.svg"}
                   alt={user.first_name}
                   width={48}
                   height={48}
                   className="w-full h-full object-cover"
                   style={{ filter: "drop-shadow(0 0 4px rgba(255,255,255,0.1))" }}
+                  crossOrigin="anonymous"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.src = `/placeholder.svg?height=48&width=48&text=${user.first_name[0]}`
                   }}
                 />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-400 text-lg font-bold">
+                  {user?.first_name?.[0] || "U"}
+                </div>
               )}
             </div>
             <div>

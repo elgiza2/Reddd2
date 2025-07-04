@@ -9,6 +9,7 @@ import { TonLogo } from "@/components/ton-logo"
 import { useSound } from "@/hooks/use-sound"
 import { useTelegram } from "@/hooks/use-telegram"
 import { ArrowLeft, Copy, Users } from "lucide-react"
+import Image from "next/image"
 
 interface UserStats {
   friendsCount: number
@@ -23,6 +24,7 @@ interface Referral {
   referrerUsername: string
   createdAt: string
   level: number
+  photo_url?: string
 }
 
 export default function FriendsPage() {
@@ -39,7 +41,7 @@ export default function FriendsPage() {
 
   const router = useRouter()
   const { playSound } = useSound()
-  const { hapticFeedback, showAlert, user } = useTelegram()
+  const { hapticFeedback, showAlert, user, getUserPhoto } = useTelegram()
 
   // Load balance and user stats
   useEffect(() => {
@@ -78,7 +80,19 @@ export default function FriendsPage() {
       if (response.ok) {
         const data = await response.json()
         setUserStats(data.stats)
-        setReferrals(data.referrals)
+
+        // Load photos for referrals
+        const referralsWithPhotos = await Promise.all(
+          data.referrals.map(async (referral: Referral) => {
+            const photoUrl = await getUserPhoto(referral.userId)
+            return {
+              ...referral,
+              photo_url: photoUrl,
+            }
+          }),
+        )
+
+        setReferrals(referralsWithPhotos)
       }
     } catch (error) {
       console.error("Error loading user stats:", error)
@@ -237,10 +251,35 @@ export default function FriendsPage() {
                   <div className="space-y-2">
                     {referrals.slice(0, 5).map((referral, index) => (
                       <div key={index} className="bg-gray-800 rounded-lg p-2 flex justify-between items-center">
-                        <div>
-                          <div className="text-sm font-medium">@{referral.referrerUsername}</div>
-                          <div className="text-xs text-gray-400">
-                            {new Date(referral.createdAt).toLocaleDateString("ar")}
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex items-center justify-center">
+                            {referral.photo_url ? (
+                              <Image
+                                src={referral.photo_url || "/placeholder.svg"}
+                                alt={referral.referrerUsername}
+                                width={32}
+                                height={32}
+                                className="w-full h-full object-cover"
+                                crossOrigin="anonymous"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  const parent = target.parentElement
+                                  if (parent) {
+                                    parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-400 text-xs font-bold">${referral.referrerUsername[0]?.toUpperCase() || "U"}</div>`
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="text-gray-400 text-xs font-bold">
+                                {referral.referrerUsername[0]?.toUpperCase() || "U"}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">@{referral.referrerUsername}</div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(referral.createdAt).toLocaleDateString("ar")}
+                            </div>
                           </div>
                         </div>
                         <div className="text-xs bg-yellow-400 text-black px-2 py-1 rounded">
