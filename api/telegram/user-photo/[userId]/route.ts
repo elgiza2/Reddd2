@@ -1,90 +1,65 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// This API route fetches user profile photos from Telegram
 export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
-  const userId = params.userId
-
   try {
+    const { userId } = params
     const botToken = process.env.TELEGRAM_BOT_TOKEN
 
     if (!botToken) {
-      console.log("No Telegram bot token provided")
-      return NextResponse.json({ photo_url: null }, { status: 200 })
+      console.error("TELEGRAM_BOT_TOKEN is not set")
+      return NextResponse.json({ error: "Bot token not configured" }, { status: 500 })
     }
 
-    // Get user profile photos from Telegram Bot API
+    console.log(`Fetching photo for user ID: ${userId}`)
+
+    // Get user profile photos
     const photosResponse = await fetch(
       `https://api.telegram.org/bot${botToken}/getUserProfilePhotos?user_id=${userId}&limit=1`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
     )
 
     if (!photosResponse.ok) {
-      console.log(`Failed to fetch user photos: ${photosResponse.status}`)
-      return NextResponse.json({ photo_url: null }, { status: 200 })
+      console.error("Failed to fetch user profile photos:", photosResponse.status)
+      return NextResponse.json({ error: "Failed to fetch user photos" }, { status: 400 })
     }
 
     const photosData = await photosResponse.json()
+    console.log("Photos response:", JSON.stringify(photosData, null, 2))
 
     if (!photosData.ok || !photosData.result.photos || photosData.result.photos.length === 0) {
       console.log("No profile photos found for user")
-      return NextResponse.json({ photo_url: null }, { status: 200 })
+      return NextResponse.json({ photo_url: null })
     }
 
-    // Get the first (most recent) photo
+    // Get the highest resolution photo
     const photo = photosData.result.photos[0]
+    const highestResPhoto = photo[photo.length - 1] // Last element has highest resolution
+    const fileId = highestResPhoto.file_id
 
-    // Get the largest size available (last item in the array)
-    const largestPhoto = photo[photo.length - 1]
+    console.log(`Getting file info for file_id: ${fileId}`)
 
-    // Get file information to construct download URL
-    const fileResponse = await fetch(
-      `https://api.telegram.org/bot${botToken}/getFile?file_id=${largestPhoto.file_id}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    )
+    // Get file path
+    const fileResponse = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`)
 
     if (!fileResponse.ok) {
-      console.log(`Failed to get file info: ${fileResponse.status}`)
-      return NextResponse.json({ photo_url: null }, { status: 200 })
+      console.error("Failed to get file info:", fileResponse.status)
+      return NextResponse.json({ error: "Failed to get file info" }, { status: 400 })
     }
 
     const fileData = await fileResponse.json()
+    console.log("File response:", JSON.stringify(fileData, null, 2))
 
     if (!fileData.ok || !fileData.result.file_path) {
-      console.log("Failed to get file path")
-      return NextResponse.json({ photo_url: null }, { status: 200 })
+      console.error("Invalid file response")
+      return NextResponse.json({ error: "Invalid file response" }, { status: 400 })
     }
 
-    // Construct the full photo URL
+    // Construct the photo URL
     const photoUrl = `https://api.telegram.org/file/bot${botToken}/${fileData.result.file_path}`
+    console.log(`Photo URL: ${photoUrl}`)
 
-    console.log(`Successfully fetched photo for user ${userId}`)
-    return NextResponse.json(
-      {
-        photo_url: photoUrl,
-        file_size: fileData.result.file_size,
-        width: largestPhoto.width,
-        height: largestPhoto.height,
-      },
-      { status: 200 },
-    )
+    return NextResponse.json({ photo_url: photoUrl })
   } catch (error) {
     console.error("Error fetching user photo:", error)
-    return NextResponse.json(
-      {
-        photo_url: null,
-        error: "Failed to fetch user photo",
-      },
-      { status: 200 },
-    )
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

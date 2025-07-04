@@ -3,7 +3,6 @@
 import { useTelegram } from "@/hooks/use-telegram"
 import { TonLogo } from "@/components/ton-logo"
 import { Button } from "@/components/ui/button"
-import { useSound } from "@/hooks/use-sound"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { User } from "lucide-react"
@@ -15,11 +14,9 @@ interface UserProfileProps {
 
 export function UserProfile({ balance, showDeposit = true }: UserProfileProps) {
   const { user, isLoading } = useTelegram()
-  const { playSound } = useSound()
   const router = useRouter()
 
   const handleDeposit = () => {
-    playSound("click")
     router.push("/deposit")
   }
 
@@ -55,8 +52,6 @@ export function UserProfile({ balance, showDeposit = true }: UserProfileProps) {
               crossOrigin="anonymous"
               onError={(e) => {
                 const target = e.target as HTMLImageElement
-                target.style.display = "none"
-                // Show fallback icon
                 const parent = target.parentElement
                 if (parent) {
                   parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-gray-400"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>`

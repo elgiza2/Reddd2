@@ -1,171 +1,82 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { BottomNavigation } from "@/components/bottom-navigation"
+import { useState } from "react"
 import { UserProfileLarge } from "@/components/user-profile-large"
-import { TonLogo } from "@/components/ton-logo"
-import { TonConnectProvider } from "@/components/ton-connect-provider"
-import { TonConnectButton } from "@/components/ton-connect-button"
-import { useInventory } from "@/hooks/use-inventory"
-import { useTelegram } from "@/hooks/use-telegram"
-import { useSound } from "@/hooks/use-sound"
-import { ArrowLeft } from "lucide-react"
-import Image from "next/image"
+import { BottomNavigation } from "@/components/bottom-navigation"
+import { TonWalletConnect } from "@/components/ton-wallet-connect"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Trophy, Star, Gift } from "lucide-react"
 
-function ProfilePageContent() {
-  const [activeTab, setActiveTab] = useState("Available")
-  const [userBalance, setUserBalance] = useState(0)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("userBalance")
-      setUserBalance(saved ? Number.parseFloat(saved) : 0)
-    }
-  }, [])
-  const router = useRouter()
-  const { playSound } = useSound()
-  const { hapticFeedback } = useTelegram()
-  const { inventory, sellItem, withdrawItem } = useInventory()
+export default function ProfilePage() {
+  const [balance] = useState(125.5)
 
-  const handleBack = () => {
-    playSound("click")
-    hapticFeedback("light")
-    router.back()
-  }
+  const achievements = [
+    { id: 1, name: "First Win", icon: Trophy, earned: true },
+    { id: 2, name: "Lucky Streak", icon: Star, earned: true },
+    { id: 3, name: "Big Winner", icon: Gift, earned: false },
+  ]
 
-  const handleSellItem = (itemId: string) => {
-    playSound("deposit")
-    sellItem(itemId)
-    // Refresh balance display
-    window.location.reload()
-  }
-
-  const handleWithdrawItem = (itemId: string) => {
-    playSound("click")
-    withdrawItem(itemId)
-  }
-
-  const tabs = ["Available", "Withdrawn", "Sold"]
-  const currentItems = inventory[activeTab.toLowerCase() as keyof typeof inventory]
+  const stats = [
+    { label: "Total Wins", value: "23" },
+    { label: "Best Streak", value: "7" },
+    { label: "Cases Opened", value: "156" },
+  ]
 
   return (
-    <div className="min-h-screen bg-black text-white pb-16">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 relative z-10">
-        <Button
-          onClick={handleBack}
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-white/10 transition-all duration-300"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
-        <h1 className="text-base font-bold text-white">Profile</h1>
-        <div className="w-16"></div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white pb-20">
+      <div className="container mx-auto px-4 py-8 max-w-md">
+        <UserProfileLarge balance={balance} showButtons={false} />
 
-      <UserProfileLarge balance={userBalance} showButtons={false} />
+        <div className="space-y-6">
+          {/* TON Wallet Connection */}
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold mb-3">TON Wallet</h3>
+              <TonWalletConnect />
+            </CardContent>
+          </Card>
 
-      {/* Wallet Connection */}
-      <div className="px-3 mb-6">
-        <h3 className="text-lg font-bold mb-3">TON Wallet</h3>
-        <TonConnectButton className="w-full" />
-      </div>
-
-      <div className="px-3">
-        <h3 className="text-lg font-bold mb-4">Inventory</h3>
-
-        <div className="flex gap-2 mb-4">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                playSound("click")
-                hapticFeedback("selection")
-                setActiveTab(tab)
-              }}
-              className={`px-4 py-2 rounded-lg font-medium text-sm backdrop-blur-sm ${
-                activeTab === tab ? "bg-yellow-400 text-black" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {tab} ({currentItems.length})
-            </button>
-          ))}
-        </div>
-
-        {currentItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="text-4xl mb-3">📦</div>
-            <p className="text-gray-400 text-center text-sm">
-              {activeTab === "Available"
-                ? "No items in your inventory yet"
-                : activeTab === "Withdrawn"
-                  ? "No withdrawn items"
-                  : "No sold items"}
-            </p>
-            <p className="text-gray-500 text-xs text-center mt-1">
-              {activeTab === "Available" ? "Open some cases to get started!" : ""}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {currentItems.map((item) => (
-              <div key={item.id} className="p-3 backdrop-blur-sm rounded-lg">
-                <div className="w-full h-24 mb-3 flex items-center justify-center">
-                  <Image
-                    src={item.image || "/placeholder.svg"}
-                    alt={item.name}
-                    width={80}
-                    height={80}
-                    className="object-contain rounded"
-                    style={{ filter: "drop-shadow(0 0 4px rgba(255,255,255,0.1))" }}
-                  />
-                </div>
-
-                <h4 className="text-white font-medium text-sm mb-1 truncate">{item.name}</h4>
-                <p className="text-gray-400 text-xs mb-2">From: {item.caseName}</p>
-
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-400 font-bold text-sm">{item.value}</span>
-                    <TonLogo size={10} />
+          {/* Statistics */}
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold mb-3">Statistics</h3>
+              <div className="grid grid-cols-3 gap-4">
+                {stats.map((stat, index) => (
+                  <div key={index} className="text-center">
+                    <div className="text-2xl font-bold text-green-400">{stat.value}</div>
+                    <div className="text-sm text-gray-400">{stat.label}</div>
                   </div>
-                  <span className="text-gray-500 text-xs">{new Date(item.dateWon).toLocaleDateString()}</span>
-                </div>
-
-                {activeTab === "Available" && (
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => handleSellItem(item.id)}
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs py-1"
-                    >
-                      Sell
-                    </Button>
-                    <Button
-                      onClick={() => handleWithdrawItem(item.id)}
-                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1"
-                    >
-                      Withdraw
-                    </Button>
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </CardContent>
+          </Card>
+
+          {/* Achievements */}
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardContent className="p-4">
+              <h3 className="text-lg font-semibold mb-3">Achievements</h3>
+              <div className="space-y-3">
+                {achievements.map((achievement) => (
+                  <div key={achievement.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <achievement.icon
+                        className={`w-6 h-6 ${achievement.earned ? "text-yellow-400" : "text-gray-500"}`}
+                      />
+                      <span className={achievement.earned ? "text-white" : "text-gray-500"}>{achievement.name}</span>
+                    </div>
+                    <Badge variant={achievement.earned ? "default" : "secondary"}>
+                      {achievement.earned ? "Earned" : "Locked"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <BottomNavigation />
     </div>
-  )
-}
-
-export default function ProfilePage() {
-  return (
-    <TonConnectProvider>
-      <ProfilePageContent />
-    </TonConnectProvider>
   )
 }
