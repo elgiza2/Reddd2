@@ -1,262 +1,276 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { BottomNavigation } from "@/components/bottom-navigation"
-import { UserProfile } from "@/components/user-profile"
-import { TonLogo } from "@/components/ton-logo"
-import { useSound } from "@/hooks/use-sound"
-import { useTelegram } from "@/hooks/use-telegram"
-import { ArrowLeft, Copy, Users } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/use-toast"
+import type { User } from "next-auth"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
-interface UserStats {
-  friendsCount: number
-  totalEarnings: number
-  level1Count: number
-  level2Count: number
-  level3Count: number
+interface FriendRequest {
+  id: string
+  senderId: string
+  receiverId: string
+  status: "pending" | "accepted" | "rejected"
+  sender: User
 }
 
-interface Referral {
-  userId: number
-  referrerUsername: string
-  createdAt: string
-  level: number
-}
-
-export default function FriendsPage() {
-  const [userBalance, setUserBalance] = useState(0)
-  const [userStats, setUserStats] = useState<UserStats>({
-    friendsCount: 0,
-    totalEarnings: 0,
-    level1Count: 0,
-    level2Count: 0,
-    level3Count: 0,
-  })
-  const [referrals, setReferrals] = useState<Referral[]>([])
-  const [loading, setLoading] = useState(true)
-
+const FriendsPage = () => {
+  const { data: session, status } = useSession()
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([])
+  const [referralCode, setReferralCode] = useState("")
+  const [generatedReferralCode, setGeneratedReferralCode] = useState("")
+  const [referralLink, setReferralLink] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+  const { toast } = useToast()
   const router = useRouter()
-  const { playSound } = useSound()
-  const { hapticFeedback, showAlert, user } = useTelegram()
 
-  // Load balance and user stats
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("userBalance")
-      setUserBalance(saved ? Number.parseFloat(saved) : 0)
+    const fetchFriendRequests = async () => {
+      if (session?.user?.id) {
+        setIsLoading(true)
+        try {
+          const response = await fetch("/api/friends")
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+          const data = await response.json()
+          setFriendRequests(data)
+        } catch (error) {
+          console.error("Failed to fetch friend requests:", error)
+          toast({
+            title: "Error fetching friend requests",
+            description: "Please try again later.",
+            variant: "destructive",
+          })
+        } finally {
+          setIsLoading(false)
+        }
+      }
     }
 
-    if (user) {
-      loadUserStats()
-      saveUserData()
-    }
-  }, [user])
+    fetchFriendRequests()
+  }, [session?.user?.id, toast])
 
-  const saveUserData = async () => {
-    if (!user) return
+  useEffect(() => {
+    if (session?.user?.id) {
+      setGeneratedReferralCode(session.user.id)
+    }
+  }, [session?.user?.id])
+
+  useEffect(() => {
+    if (generatedReferralCode) {
+      setReferralLink(`${window.location.origin}/register?referral=${generatedReferralCode}`)
+    }
+  }, [generatedReferralCode])
+
+  const handleAccept = async (friendRequestId: string) => {
+    try {
+      const response = await fetch(`/api/friends/${friendRequestId}/accept`, {
+        method: "PUT",
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      setFriendRequests((prevRequests) =>
+        prevRequests.map((req) => (req.id === friendRequestId ? { ...req, status: "accepted" } : req)),
+      )
+      toast({
+        title: "Friend request accepted!",
+      })
+    } catch (error) {
+      console.error("Failed to accept friend request:", error)
+      toast({
+        title: "Error accepting friend request",
+        description: "Please try again later.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleReject = async (friendRequestId: string) => {
+    try {
+      const response = await fetch(`/api/friends/${friendRequestId}/reject`, {
+        method: "PUT",
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      setFriendRequests((prevRequests) =>
+        prevRequests.map((req) => (req.id === friendRequestId ? { ...req, status: "rejected" } : req)),
+      )
+      toast({
+        title: "Friend request rejected",
+      })
+    } catch (error) {
+      console.error("Failed to reject friend request:", error)
+      toast({
+        title: "Error rejecting friend request",
+        description: "Please try again later.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddFriend = async () => {
+    if (!referralCode) {
+      toast({
+        title: "Error",
+        description: "Please enter a referral code.",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
-      await fetch("/api/telegram/save-user", {
+      const response = await fetch("/api/friends/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(user),
+        body: JSON.stringify({ referralCode }),
       })
-    } catch (error) {
-      console.error("Error saving user data:", error)
-    }
-  }
 
-  const loadUserStats = async () => {
-    if (!user) return
-
-    try {
-      const response = await fetch(`/api/telegram/user-stats/${user.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setUserStats(data.stats)
-        setReferrals(data.referrals)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
       }
-    } catch (error) {
-      console.error("Error loading user stats:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleBack = () => {
-    playSound("click")
-    hapticFeedback("light")
-    router.back()
-  }
-
-  const handleInvite = () => {
-    playSound("click")
-    hapticFeedback("medium")
-
-    const username = user?.username || user?.id || "user"
-    const inviteLink = `https://t.me/Spaceklbot?startapp=${username}`
-
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(inviteLink).then(() => {
-        showAlert("تم نسخ رابط الدعوة!")
+      toast({
+        title: "Friend request sent!",
       })
-    } else {
-      showAlert(`شارك هذا الرابط: ${inviteLink}`)
+      router.refresh() // Refresh the route to update the friend requests
+    } catch (error: any) {
+      console.error("Failed to add friend:", error)
+      toast({
+        title: "Error adding friend",
+        description: error.message || "Please try again later.",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleWithdraw = () => {
-    playSound("click")
-    hapticFeedback("medium")
-    showAlert("ميزة السحب قريباً!")
-  }
-
-  if (loading) {
+  if (status === "loading" || isLoading) {
     return (
-      <div className="min-h-screen bg-black text-white pb-16 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-400 mx-auto mb-4"></div>
-          <p className="text-gray-400">جاري التحميل...</p>
+      <div className="container mx-auto py-10">
+        <h1 className="text-3xl font-bold mb-4">Friends</h1>
+        <div className="grid gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Skeleton className="h-6 w-32" />
+              </CardTitle>
+              <CardDescription>
+                <Skeleton className="h-4 w-64" />
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-10 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Skeleton className="h-6 w-32" />
+              </CardTitle>
+              <CardDescription>
+                <Skeleton className="h-4 w-64" />
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-10 w-full" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white pb-16">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 relative z-10">
-        <Button
-          onClick={handleBack}
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-white/10 transition-all duration-300"
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          رجوع
-        </Button>
-        <h1 className="text-base font-bold text-white">الأصدقاء</h1>
-        <div className="w-16"></div>
-      </div>
+    <div className="container mx-auto py-10">
+      <h1 className="text-3xl font-bold mb-4">Friends</h1>
 
-      <UserProfile balance={userBalance} showDeposit={false} />
-
-      <div className="px-3">
-        <Button
-          onClick={handleInvite}
-          className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg mb-4 text-sm backdrop-blur-sm w-full flex items-center justify-center gap-2"
-        >
-          <Copy className="w-4 h-4" />
-          دعوة صديق
-        </Button>
-      </div>
-
-      <div className="px-3 py-4">
-        <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
-              i
-            </div>
-            <h3 className="text-base font-bold">نظام الإحالة 3 مستويات</h3>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Add Friend</CardTitle>
+          <CardDescription>Enter your friend's referral code to send a friend request.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="referralCode" className="text-right">
+              Referral Code
+            </Label>
+            <Input
+              id="referralCode"
+              className="col-span-3"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
+            />
           </div>
+          <Button onClick={handleAddFriend}>Add Friend</Button>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">المستوى 1 - 10%</span>
-            <span className="text-gray-400">→</span>
-            <span className="text-gray-400">المستوى 2 - 5%</span>
-            <span className="text-gray-400">→</span>
-            <span className="text-gray-400">المستوى 3 - 2.5%</span>
-          </div>
-        </div>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Your Referral Link</CardTitle>
+          <CardDescription>Share this link with your friends to earn rewards!</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Input type="text" value={referralLink} readOnly />
+        </CardContent>
+      </Card>
 
-        <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h4 className="text-gray-400 mb-1 text-sm">رصيد الإحالة</h4>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-bold">{userStats.totalEarnings.toFixed(2)}</span>
-                <TonLogo size={16} />
-              </div>
-            </div>
-            <Button
-              onClick={handleWithdraw}
-              className="bg-yellow-400 hover:bg-yellow-500 text-black font-bold px-4 py-2 rounded-lg text-sm backdrop-blur-sm"
-              disabled={userStats.totalEarnings === 0}
-            >
-              سحب
-            </Button>
-          </div>
-        </div>
-
-        <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
-          <p className="text-gray-300 text-xs leading-relaxed">
-            هل لديك قناة تليجرام وتريد نشر أكواد الخصم الحصرية لجمهورك؟{" "}
-            <span className="text-yellow-400 font-bold">تواصل مع @Justceof!</span>
-          </p>
-        </div>
-
-        <div className="bg-gray-900/50 rounded-lg p-4 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Users className="w-5 h-5 text-yellow-400" />
-            <h3 className="text-lg font-bold">الأصدقاء</h3>
-            <span className="bg-gray-700 text-white px-2 py-1 rounded-full text-xs font-bold">
-              {userStats.friendsCount}
-            </span>
-          </div>
-
-          {userStats.friendsCount === 0 ? (
-            <div className="text-center py-6">
-              <div className="text-3xl mb-2">👥</div>
-              <p className="text-gray-400 text-sm">لا يوجد أصدقاء بعد</p>
-              <p className="text-gray-500 text-xs mt-1">ادع أصدقاءك لكسب مكافآت الإحالة!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-lg font-bold text-yellow-400">{userStats.level1Count}</div>
-                  <div className="text-xs text-gray-400">المستوى 1</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-lg font-bold text-yellow-400">{userStats.level2Count}</div>
-                  <div className="text-xs text-gray-400">المستوى 2</div>
-                </div>
-                <div className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-lg font-bold text-yellow-400">{userStats.level3Count}</div>
-                  <div className="text-xs text-gray-400">المستوى 3</div>
-                </div>
-              </div>
-
-              {referrals.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-bold mb-2">آخر الإحالات:</h4>
-                  <div className="space-y-2">
-                    {referrals.slice(0, 5).map((referral, index) => (
-                      <div key={index} className="bg-gray-800 rounded-lg p-2 flex justify-between items-center">
-                        <div>
-                          <div className="text-sm font-medium">@{referral.referrerUsername}</div>
-                          <div className="text-xs text-gray-400">
-                            {new Date(referral.createdAt).toLocaleDateString("ar")}
-                          </div>
-                        </div>
-                        <div className="text-xs bg-yellow-400 text-black px-2 py-1 rounded">
-                          المستوى {referral.level}
-                        </div>
-                      </div>
-                    ))}
+      <h2 className="text-2xl font-semibold mb-4">Friend Requests</h2>
+      {friendRequests.length === 0 ? (
+        <p>No friend requests.</p>
+      ) : (
+        <div className="grid gap-4">
+          {friendRequests.map((request) => (
+            <Card key={request.id}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="flex items-center space-x-4">
+                  <Avatar>
+                    <AvatarImage src={request.sender.image || ""} />
+                    <AvatarFallback>{request.sender.name?.[0] || "U"}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <CardTitle>{request.sender.name}</CardTitle>
+                    <CardDescription>
+                      {request.status === "pending"
+                        ? "Pending"
+                        : request.status === "accepted"
+                          ? "Accepted"
+                          : "Rejected"}
+                    </CardDescription>
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+                {request.status === "pending" && (
+                  <div>
+                    <Button size="sm" variant="outline" onClick={() => handleAccept(request.id)}>
+                      Accept
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => handleReject(request.id)}>
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </CardHeader>
+            </Card>
+          ))}
         </div>
-      </div>
-
-      <BottomNavigation />
+      )}
     </div>
   )
 }
+
+export default FriendsPage

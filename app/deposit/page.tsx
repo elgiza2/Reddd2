@@ -1,206 +1,85 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "react-hot-toast"
+
+import { useStore } from "@/store/store"
 import { Button } from "@/components/ui/button"
-import { TonLogo } from "@/components/ton-logo"
 import { Input } from "@/components/ui/input"
-import { TonConnectProvider } from "@/components/ton-connect-provider"
-import { TonWalletConnect } from "@/components/ton-wallet-connect"
-import { useTonConnect } from "@/hooks/use-ton-connect"
-import { useSound } from "@/hooks/use-sound"
-import { ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
-function DepositPageContent() {
-  const [amount, setAmount] = useState("1")
-  const [promoCode, setPromoCode] = useState("")
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
+const DepositPage = () => {
   const router = useRouter()
-  const { playSound } = useSound()
-  const { sendTonPayment, isConnected, isProcessing: tonProcessing } = useTonConnect()
+  const [amount, setAmount] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const increaseBalance = useStore((state) => state.increaseBalance)
 
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    if (successMessage || errorMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage(null)
-        setErrorMessage(null)
-      }, 5000)
-      return () => clearTimeout(timer)
-    }
-  }, [successMessage, errorMessage])
-
-  const handleBack = () => {
-    playSound("click")
-    router.back()
-  }
-
-  const validateAmount = () => {
-    const numAmount = Number.parseFloat(amount)
-    if (!amount || numAmount <= 0) {
-      setErrorMessage("Please enter a valid amount")
-      return false
-    }
-    if (numAmount < 0.1) {
-      setErrorMessage("Minimum deposit is 0.1 TON")
-      return false
-    }
-    if (numAmount > 1000) {
-      setErrorMessage("Maximum deposit is 1000 TON")
-      return false
-    }
-    return true
-  }
-
-  const handleTonDeposit = async () => {
-    if (!validateAmount()) return
-
-    setIsProcessing(true)
-    setErrorMessage(null)
-    setSuccessMessage(null)
-
+  const handleDeposit = async (paymentMethod: "card" | "paypal") => {
+    setIsLoading(true)
     try {
-      if (!isConnected) {
-        setErrorMessage("Please connect your TON wallet first")
+      const depositAmount = Number.parseFloat(amount)
+
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        toast.error("Please enter a valid amount to deposit.")
         return
       }
 
-      const amountNum = Number.parseFloat(amount)
-      await sendTonPayment(amountNum, "PepeCase Deposit")
-      setSuccessMessage(`Successfully deposited ${amount} TON to your account!`)
+      // Simulate payment processing
+      await new Promise((resolve) => setTimeout(resolve, 1500))
 
-      // Update total deposited
-      const currentDeposited = Number.parseFloat(localStorage.getItem("totalDeposited") || "0")
-      const newTotalDeposited = currentDeposited + amountNum
-      localStorage.setItem("totalDeposited", newTotalDeposited.toString())
-
-      // Auto-redirect after success
-      setTimeout(() => {
-        router.back()
-      }, 2000)
+      increaseBalance(depositAmount)
+      toast.success(`Successfully deposited $${depositAmount} via ${paymentMethod}!`)
+      router.push("/account")
     } catch (error) {
-      console.error("TON payment failed:", error)
-      if (error instanceof Error && !error.message.includes("cancelled")) {
-        setErrorMessage(error.message)
-      }
+      console.error("Deposit failed:", error)
+      toast.error("Failed to process deposit. Please try again.")
     } finally {
-      setIsProcessing(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 relative z-10">
-        <Button
-          onClick={handleBack}
-          variant="ghost"
-          size="sm"
-          className="text-white hover:bg-white/10 transition-all duration-300"
-          disabled={isProcessing || tonProcessing}
-        >
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
-        </Button>
-        <h1 className="text-base font-bold text-white">TON Deposit</h1>
-        <div className="w-16"></div>
-      </div>
-
-      <div className="px-3 py-6">
-        <h1 className="text-2xl font-bold mb-6 text-center">TON Connect Payment</h1>
-
-        {/* Status Messages */}
-        {successMessage && (
-          <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-green-400" />
-            <span className="text-green-400 text-sm">{successMessage}</span>
-          </div>
-        )}
-
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-400" />
-            <span className="text-red-400 text-sm">{errorMessage}</span>
-          </div>
-        )}
-
-        {/* TON Wallet Connection */}
-        <div className="mb-6">
-          <TonWalletConnect showBalance={true} />
-        </div>
-
-        {/* Amount Input */}
-        <div className="mb-6">
-          <label className="text-gray-400 text-sm mb-2 block">Amount (TON)</label>
-          <div className="relative">
-            <Input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="bg-gray-900 border-gray-700 text-white text-xl font-bold py-3 pr-10"
-              placeholder="1"
-              min="0.1"
-              max="1000"
-              step="0.1"
-              disabled={isProcessing || tonProcessing}
-            />
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <TonLogo size={20} />
+    <div className="container flex items-center justify-center h-screen">
+      <Card className="w-[450px]">
+        <CardHeader>
+          <CardTitle>Deposit Funds</CardTitle>
+          <CardDescription>Add funds to your account.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="amount">Amount to Deposit</Label>
+              <Input
+                id="amount"
+                type="number"
+                placeholder="Enter amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </div>
+            <Button
+              disabled={isLoading}
+              onClick={() => handleDeposit("card")}
+              className={cn(isLoading && "cursor-not-allowed")}
+            >
+              {isLoading ? "Processing..." : "Deposit with Card"}
+            </Button>
+            <Button
+              disabled={isLoading}
+              onClick={() => handleDeposit("paypal")}
+              variant="secondary"
+              className={cn(isLoading && "cursor-not-allowed")}
+            >
+              {isLoading ? "Processing..." : "Deposit with PayPal"}
+            </Button>
           </div>
-          <p className="text-gray-500 text-xs mt-1">Min: 0.1 TON • Max: 1000 TON</p>
-        </div>
-
-        {/* Promo Code */}
-        <div className="mb-6">
-          <label className="text-gray-400 text-sm mb-2 block">Promo code (optional)</label>
-          <Input
-            value={promoCode}
-            onChange={(e) => setPromoCode(e.target.value)}
-            className="bg-gray-900 border-gray-700 text-white"
-            placeholder="Enter promo code"
-            disabled={isProcessing || tonProcessing}
-          />
-        </div>
-
-        {/* Payment Button */}
-        <Button
-          onClick={handleTonDeposit}
-          disabled={isProcessing || tonProcessing || !isConnected}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl text-lg backdrop-blur-sm"
-        >
-          {isProcessing || tonProcessing
-            ? "Processing Payment..."
-            : !isConnected
-              ? "Connect Wallet First"
-              : `Pay ${amount} TON`}
-        </Button>
-
-        {/* Info Section */}
-        <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-          <h4 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
-            <TonLogo size={16} />
-            TON Connect Payment
-          </h4>
-          <ul className="text-blue-300 text-sm space-y-1">
-            <li>• Connect your TON wallet securely</li>
-            <li>• Fast and reliable transactions</li>
-            <li>• Funds added instantly to your balance</li>
-            <li>• Minimum deposit: 0.1 TON</li>
-          </ul>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
-export default function DepositPage() {
-  return (
-    <TonConnectProvider>
-      <DepositPageContent />
-    </TonConnectProvider>
-  )
-}
+export default DepositPage
